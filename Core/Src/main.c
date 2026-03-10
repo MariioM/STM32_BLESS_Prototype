@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include "tmp102.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -74,8 +75,6 @@ char uart_buff[50];
 
 
 // ---------- SENSORS  CONFIG ---------------//
-static const uint8_t TMP102_ADDR = 0x48 << 1;
-static const uint8_t TMP102_REG = 0x00;
 float internal_temp = 0.0;
 
 /* USER CODE END PV */
@@ -89,7 +88,6 @@ static void MX_TIM4_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
-float TMP102_TakeMeasurement_I2C(HAL_StatusTypeDef ret);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -166,7 +164,7 @@ int main(void)
 	  		  break;
 
 	  	  case ST_ACQUIRE:
-	  		  internal_temp = TMP102_TakeMeasurement_I2C(ret);
+	  		  internal_temp = TMP102_Read_Temp(&hi2c1, TMP102_I2C_ADDRESS_GND);
 
 	  		  if (internal_temp < -150.0){
 	  			  error = 1;
@@ -522,42 +520,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-/* SENSOR FUNCTIONS */
-
-float TMP102_TakeMeasurement_I2C(HAL_StatusTypeDef ret){
-	//Declare variables
-	int16_t val;
-	uint8_t i2c_data[2];
-	float temp_c;
-	// Transmit to TMP102 that we want to read from the temperature register
-	uart_buff[0] = TMP102_REG;
-	ret = HAL_I2C_Master_Transmit(&hi2c1, TMP102_ADDR, &TMP102_REG, 1, 50);
-	if(ret != HAL_OK){
-		return -128.0;
-	}else{
-		// Read 2 bytes from the temperature register
-		ret = HAL_I2C_Master_Receive(&hi2c1, TMP102_ADDR, i2c_data, 2, 50);
-		if(ret != HAL_OK){
-			return -129.0;
-		}else{
-			// Combine the bytes
-			val = ((int16_t)i2c_data[0] << 4) | (i2c_data[1] >> 4);
-
-			// Convert to 2's complement, since temperature can be negative
-			if(val > 0x7FF){
-				val |= 0xF000;
-			}
-
-			// Convert to float temperature value (Celsius)
-			temp_c = val * 0.0625;
-
-			return temp_c;
-		}
-	}
-
-}
-
 // Hardware interruptions
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	// Check which timer has make the interruption
