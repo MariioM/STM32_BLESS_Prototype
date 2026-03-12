@@ -19,10 +19,11 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
-
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include "tmp102.h"
+#include "max31865.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,6 +43,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
+
+SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
@@ -71,13 +74,12 @@ volatile uint8_t tx_timer = 0;
 volatile uint8_t error = 0;
 
 // UART buffer size
-char uart_buff[50];
+char uart_buff[500];
 
 
 // ---------- SENSORS  CONFIG ---------------//
-static const uint8_t TMP102_ADDR = 0x48 << 1;
-static const uint8_t TMP102_REG = 0x00;
 float internal_temp = 0.0;
+float external_temp = 0.0;
 
 /* USER CODE END PV */
 
@@ -89,8 +91,8 @@ static void MX_TIM3_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_SPI2_Init(void);
 /* USER CODE BEGIN PFP */
-float TMP102_TakeMeasurement_I2C(HAL_StatusTypeDef ret);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -135,10 +137,13 @@ int main(void)
   MX_TIM4_Init();
   MX_USART2_UART_Init();
   MX_I2C1_Init();
+  MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_TIM_Base_Start_IT(&htim3);
   HAL_TIM_Base_Start_IT(&htim4);
+
+  MAX31865_Init(&hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -167,7 +172,8 @@ int main(void)
 	  		  break;
 
 	  	  case ST_ACQUIRE:
-	  		  internal_temp = TMP102_TakeMeasurement_I2C(ret);
+	  		  internal_temp = TMP102_Read_Temp(&hi2c1, TMP102_I2C_ADDRESS_GND);
+	  		  external_temp = MAX31865_Read_Temp(&hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin);
 
 	  		  if (internal_temp < -150.0){
 	  			  error = 1;
@@ -178,7 +184,7 @@ int main(void)
 	  		break;
 
 	  	  case ST_LOG:
-	  		  int len = sprintf(uart_buff, "INTERNAL TEMP: %.2f ºC\r\n", internal_temp);
+	  		  int len = sprintf(uart_buff, "INTERNAL TEMP: %.2f ºC\r\nEXTERNAL TEMP: %.2f ºC\r\n", internal_temp, external_temp);
 	  		  HAL_UART_Transmit(&huart2, (uint8_t *)uart_buff, len, 100);
 
 	  		  log_timer = 0;
@@ -310,6 +316,46 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_HIGH;
+  hspi2.Init.CLKPhase = SPI_PHASE_2EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 7;
+  hspi2.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi2.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
 
 }
 
@@ -504,6 +550,9 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
@@ -517,48 +566,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : SPI2_CS_Pin */
+  GPIO_InitStruct.Pin = SPI2_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(SPI2_CS_GPIO_Port, &GPIO_InitStruct);
+
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-
-/* SENSOR FUNCTIONS */
-
-float TMP102_TakeMeasurement_I2C(HAL_StatusTypeDef ret){
-	//Declare variables
-	int16_t val;
-	uint8_t i2c_data[2];
-	float temp_c;
-	// Transmit to TMP102 that we want to read from the temperature register
-	uart_buff[0] = TMP102_REG;
-	ret = HAL_I2C_Master_Transmit(&hi2c1, TMP102_ADDR, &TMP102_REG, 1, 50);
-	if(ret != HAL_OK){
-		return -128.0;
-	}else{
-		// Read 2 bytes from the temperature register
-		ret = HAL_I2C_Master_Receive(&hi2c1, TMP102_ADDR, i2c_data, 2, 50);
-		if(ret != HAL_OK){
-			return -129.0;
-		}else{
-			// Combine the bytes
-			val = ((int16_t)i2c_data[0] << 4) | (i2c_data[1] >> 4);
-
-			// Convert to 2's complement, since temperature can be negative
-			if(val > 0x7FF){
-				val |= 0xF000;
-			}
-
-			// Convert to float temperature value (Celsius)
-			temp_c = val * 0.0625;
-
-			return temp_c;
-		}
-	}
-
-}
-
 // Hardware interruptions
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	// Check which timer has make the interruption
