@@ -2,7 +2,7 @@
  * tmp102.c
  *
  *  Created on: 10 mar 2026
- *      Author: Mariio
+ *
  */
 
 #include "../Inc/tmp102.h"
@@ -14,9 +14,14 @@ float TMP102_Read_Temp(I2C_HandleTypeDef *hi2c, uint16_t dev_address){
 
 	status = HAL_I2C_Mem_Read(hi2c, dev_address, TMP102_I2C_REG_TEMP, I2C_MEMADD_SIZE_8BIT, data, 2, 100);
 
+
 	if(status != HAL_OK){
 		return -999.0;
 	}
+
+	//data[0] = 10011101
+	//data[1] = 11110000
+	//raw_temp = 11111001 11011111
 
 	// Prepare the temperature
 	uint16_t raw_temp = 0;

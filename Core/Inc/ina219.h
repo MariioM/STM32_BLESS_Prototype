@@ -2,7 +2,7 @@
  * ina219.h
  *
  *  Created on: 12 mar 2026
- *      Author: Mariio
+ *
  */
 
 #ifndef INC_INA219_H_
@@ -49,6 +49,8 @@
 typedef struct{
 	uint16_t dev_address;
 	float current_lsb;
+	int16_t current;
+	int16_t power;
 } INA219_t;
 
 /**** FUNCTION DEFINITIONS ****/

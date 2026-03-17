@@ -22,8 +22,12 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+
 #include "tmp102.h"
 #include "max31865.h"
+
+#include "telemetry.h"
+#include "sensors.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -81,6 +85,9 @@ char uart_buff[500];
 float internal_temp = 0.0;
 float external_temp = 0.0;
 
+//----------- Packet Config ----------------//
+TelemetryPacket packet;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -108,10 +115,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
-	HAL_StatusTypeDef ret;
-
-
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -143,7 +146,7 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim3);
   HAL_TIM_Base_Start_IT(&htim4);
 
-  MAX31865_Init(&hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin);
+  Sensors_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -157,11 +160,7 @@ int main(void)
 
 	  	  case ST_INIT:
 	  		  HAL_UART_Transmit(&huart2, (uint8_t *)"STATE: INIT\r\n", 13, 10);
-	  		  if(!error){
-	  			  currentState = ST_IDLE;
-	  		  }else{
-	  			  currentState = ST_ERROR;
-	  		  }
+	  		  currentState = ST_IDLE;
 	  		  break;
 
 	  	  case ST_IDLE:
@@ -172,10 +171,7 @@ int main(void)
 	  		  break;
 
 	  	  case ST_ACQUIRE:
-	  		  internal_temp = TMP102_Read_Temp(&hi2c1, TMP102_I2C_ADDRESS_GND);
-	  		  external_temp = MAX31865_Read_Temp(&hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin);
-
-	  		  if (internal_temp < -150.0){
+	  		  if (!readSensors(&packet)){
 	  			  error = 1;
 	  			  currentState = ST_ERROR;
 	  		  } else{
@@ -184,9 +180,7 @@ int main(void)
 	  		break;
 
 	  	  case ST_LOG:
-	  		  int len = sprintf(uart_buff, "INTERNAL TEMP: %.2f ºC\r\nEXTERNAL TEMP: %.2f ºC\r\n", internal_temp, external_temp);
-	  		  HAL_UART_Transmit(&huart2, (uint8_t *)uart_buff, len, 100);
-
+	  		  printTelemetry(&packet);
 	  		  log_timer = 0;
 	  		  currentState = ST_CHECK_TX;
 	  		  break;
@@ -212,9 +206,8 @@ int main(void)
 	  		  break;
 	  	  case ST_ERROR:
 	  		  HAL_UART_Transmit(&huart2, (uint8_t*)"ESTADO: ERROR\r\n", 15, 10);
-	  		  if (!error){
-	  			currentState = ST_IDLE;
-	  		  }
+	  		  currentState = ST_IDLE;
+	  		  error = 0;
 	  		  break;
 
 	  }

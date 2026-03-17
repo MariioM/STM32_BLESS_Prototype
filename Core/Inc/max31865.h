@@ -2,7 +2,7 @@
  * max31865.h
  *
  *  Created on: 11 mar 2026
- *      Author: Mariio
+ *
  */
 
 #ifndef INC_MAX31865_H_
