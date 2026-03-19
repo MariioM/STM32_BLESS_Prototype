@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "fatfs.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -49,6 +50,7 @@
 I2C_HandleTypeDef hi2c1;
 
 SPI_HandleTypeDef hspi2;
+SPI_HandleTypeDef hspi3;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
@@ -88,6 +90,12 @@ float external_temp = 0.0;
 //----------- Packet Config ----------------//
 TelemetryPacket packet;
 
+//----------- SD CONFIG ----------------//
+FATFS fs; // Files System
+FIL fil; // File
+FRESULT fres; // Save errors
+UINT bytesWrote; // Number of bytes written
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -99,6 +107,7 @@ static void MX_TIM4_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI2_Init(void);
+static void MX_SPI3_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
@@ -141,6 +150,8 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   MX_SPI2_Init();
+  MX_SPI3_Init();
+  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_TIM_Base_Start_IT(&htim3);
@@ -180,7 +191,28 @@ int main(void)
 	  		break;
 
 	  	  case ST_LOG:
+
+	  		  packet.timestamp = HAL_GetTick() / 1000;
+	  		  packet.count++;
+
 	  		  printTelemetry(&packet);
+
+	  		  // Save on SD
+	  		  f_mount(&fs, "", 0);
+
+	  		  if(fres == FR_OK){
+	  			  fres = f_open(&fil, "data.bin", FA_WRITE | FA_OPEN_APPEND);
+
+	  			  if(fres == FR_OK){
+	  				  f_write(&fil, &packet, sizeof(TelemetryPacket), &bytesWrote);
+	  				  f_close(&fil);
+	  			  }
+	  			  f_mount(&fs, "", 0);
+	  		  }
+
+
+
+
 	  		  log_timer = 0;
 	  		  currentState = ST_CHECK_TX;
 	  		  break;
@@ -205,7 +237,19 @@ int main(void)
 	  		  currentState = ST_IDLE;
 	  		  break;
 	  	  case ST_ERROR:
-	  		  HAL_UART_Transmit(&huart2, (uint8_t*)"ESTADO: ERROR\r\n", 15, 10);
+	  		if(packet.error_flags != 0){
+	  				printf("ERROR FLAGS : 0x%02X\r\n", packet.error_flags);
+
+	  				if(packet.error_flags & 0x01){
+	  					printf(" [Error: TMP102]\r\n");
+	  				}
+	  				if(packet.error_flags & 0x02){
+	  					printf(" [Error: PT100]\r\n");
+	  				}
+	  				if(packet.error_flags & 0x04){
+	  					printf(" [Error: SD Card]\r\n");
+	  				}
+	  			}
 	  		  currentState = ST_IDLE;
 	  		  error = 0;
 	  		  break;
@@ -349,6 +393,46 @@ static void MX_SPI2_Init(void)
   /* USER CODE BEGIN SPI2_Init 2 */
 
   /* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
+  * @brief SPI3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI3_Init(void)
+{
+
+  /* USER CODE BEGIN SPI3_Init 0 */
+
+  /* USER CODE END SPI3_Init 0 */
+
+  /* USER CODE BEGIN SPI3_Init 1 */
+
+  /* USER CODE END SPI3_Init 1 */
+  /* SPI3 parameter configuration*/
+  hspi3.Instance = SPI3;
+  hspi3.Init.Mode = SPI_MODE_MASTER;
+  hspi3.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi3.Init.DataSize = SPI_DATASIZE_4BIT;
+  hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi3.Init.NSS = SPI_NSS_SOFT;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi3.Init.CRCPolynomial = 7;
+  hspi3.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi3.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+  if (HAL_SPI_Init(&hspi3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI3_Init 2 */
+
+  /* USER CODE END SPI3_Init 2 */
 
 }
 
@@ -539,9 +623,13 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(SPI3_CS_GPIO_Port, SPI3_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
@@ -558,6 +646,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SPI3_CS_Pin */
+  GPIO_InitStruct.Pin = SPI3_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(SPI3_CS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : SPI2_CS_Pin */
   GPIO_InitStruct.Pin = SPI2_CS_Pin;

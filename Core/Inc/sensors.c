@@ -15,11 +15,12 @@ INA219_t ina;
 
 void Sensors_Init(){
 	MAX31865_Init(&hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin);
-	INA219_INIT(&hi2c1, &ina, INA219_R100, 65000);
+	INA219_INIT(&hi2c1, &ina, INA219_I2C_ADDRESS_GND_GND ,INA219_R100, 3.2);
 }
 
 uint8_t readSensors(TelemetryPacket *packet){
 	uint8_t success = 1;
+	packet->sync = 0xB1E5;
 	packet->error_flags = 0;
 
 	// Internal Temperature

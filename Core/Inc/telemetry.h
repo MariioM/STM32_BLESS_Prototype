@@ -10,7 +10,7 @@
 
 typedef struct TelemetryPacket{
 	// HEADER
-	uint16_t sync = 0xB1E5;
+	uint16_t sync;
 	uint32_t timestamp;
 	uint32_t count;
 

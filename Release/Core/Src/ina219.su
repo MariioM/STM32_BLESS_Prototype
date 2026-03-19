@@ -1,0 +1,3 @@
+../Core/Src/ina219.c:9:6:INA219_INIT	40	static
+../Core/Src/ina219.c:21:9:INA219_READ_CURRENT	32	static
+../Core/Src/ina219.c:40:9:INA219_READ_POWER	32	static

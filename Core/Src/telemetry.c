@@ -41,7 +41,7 @@ void printTelemetry(TelemetryPacket *packet){
 	printf("Temperature - EXT: %.2f C | INT: %.2f C\r\n", packet->ext_temp / 100.0, packet->int_temp / 100.0);
 
 	// System State and Security
-	printf("FSM State: %u | Checksum: 0x%04X\r\n", packet->fsm_state, packet->checksum);
+	printf("Checksum: 0x%04X\r\n", packet->checksum);
 
 	if(packet->error_flags != 0){
 		printf("ERROR FLAGS : 0x%02X\r\n", packet->error_flags);

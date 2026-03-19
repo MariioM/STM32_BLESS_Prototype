@@ -45,11 +45,7 @@ float MAX31865_Read_Temp(SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_gpio_port, ui
 
 	// Prepare the ADC_Code
 	adc_code = ((rx_data[1] << 8) | rx_data[2]) >> 1;
-	float R_REF = 430.0;      // Resistencia de referencia en la placa (430.0 o 400.0)
-	float R_NOMINAL = 100.0;  // Resistencia de la PT100 a 0°C
 
-	// 2. Calcular la resistencia actual de la sonda (RTD)
-	// adc_code es el valor de 15 bits que ya tienes
 	float resistance = (float)adc_code * R_REF / 32768.0;
 	// Use the generalized formula to calculate the temperature in ºC (PT100, [-100 - 100 ºC])
 	return (resistance - R_NOMINAL) / 0.3851;

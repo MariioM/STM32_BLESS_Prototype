@@ -6,8 +6,9 @@
  */
 #include "../Inc/ina219.h"
 
-void INA219_INIT(I2C_HandleTypeDef *hi2c, INA219_t *ina, float r_shunt, float max_current){
+void INA219_INIT(I2C_HandleTypeDef *hi2c, INA219_t *ina, uint16_t address, float r_shunt, float max_current){
 	ina->current_lsb = max_current / 32768.0;
+	ina->dev_address = address;
 	uint16_t cal = (INA219_FIXED_SCALE_VALUE / (ina->current_lsb * r_shunt));
 	uint8_t data[2];
 
