@@ -1,2 +1,0 @@
-../Core/Inc/sensors.c:16:6:Sensors_Init	8	static
-../Core/Inc/sensors.c:21:9:readSensors	24	static

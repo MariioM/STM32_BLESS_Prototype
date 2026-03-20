@@ -124,6 +124,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+	HAL_UART_Transmit(&huart2, (uint8_t *)"BLESS System Initialized\r\n", 13, 10);
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -198,16 +199,22 @@ int main(void)
 	  		  printTelemetry(&packet);
 
 	  		  // Save on SD
-	  		  f_mount(&fs, "", 0);
-
+	  		  fres = f_mount(&fs, "", 1);
 	  		  if(fres == FR_OK){
-	  			  fres = f_open(&fil, "data.bin", FA_WRITE | FA_OPEN_APPEND);
-
+	  			  fres = f_open(&fil, "data_hal.bin", FA_WRITE | FA_OPEN_APPEND);
 	  			  if(fres == FR_OK){
 	  				  f_write(&fil, &packet, sizeof(TelemetryPacket), &bytesWrote);
 	  				  f_close(&fil);
 	  			  }
-	  			  f_mount(&fs, "", 0);
+	  			  else{
+	  				packet.error_flags |= 0x12;
+	  				currentState = ST_ERROR;
+	  			  }
+	  			  f_mount(NULL, "", 0);
+
+	  		  }else{
+	  			  packet.error_flags |= 0x11;
+	  			currentState = ST_ERROR;
 	  		  }
 
 
@@ -415,17 +422,17 @@ static void MX_SPI3_Init(void)
   hspi3.Instance = SPI3;
   hspi3.Init.Mode = SPI_MODE_MASTER;
   hspi3.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi3.Init.DataSize = SPI_DATASIZE_4BIT;
+  hspi3.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi3.Init.NSS = SPI_NSS_SOFT;
-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
   hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
   hspi3.Init.CRCPolynomial = 7;
   hspi3.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-  hspi3.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+  hspi3.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
   if (HAL_SPI_Init(&hspi3) != HAL_OK)
   {
     Error_Handler();
@@ -629,7 +636,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(SPI3_CS_GPIO_Port, SPI3_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(SPI3_CS_GPIO_Port, SPI3_CS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
